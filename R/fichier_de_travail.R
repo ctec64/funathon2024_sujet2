@@ -142,3 +142,233 @@ carte_localisation_aeroport <- leaflet(data=airports_location) %>%
   addMarkers(popup = ~Nom)
 
 carte_localisation_aeroport
+
+#graphique dynamique des trafics
+graph_trafic <- ggplot(trafic_aeroports,aes(x=date,y=trafic)) +
+  geom_line(stat="identity")
+
+graph_trafic
+
+#Tableau HTML pour afficher les données ----
+
+YEARS_LIST  <- as.character(2018:2022)
+MONTHS_LIST <- 1:12
+
+#filtre sur un mois et une année
+aeroport_filtre <- pax_apt_all %>% 
+  filter(mois=="7" & an=="2022")
+
+#création de la fonction
+create_data_from_input <- function(dataframe, year, month) {
+  dataframe <- dataframe %>% 
+    filter(mois==month & an==year)
+  
+  return(dataframe)
+    
+}
+
+#classement des aéroports par fréquentation
+stats_aeroports <- pax_apt_all %>% 
+  group_by(apt,apt_nom) %>% 
+  summarise(tot_pax_dep=round(sum(apt_pax_dep,na.rm=T),3),
+            tot_pax_arr=round(sum(apt_pax_arr,na.rm=T),3),
+            tot_pax_tr=round(sum(apt_pax_tr,na.rm=T),3)) %>% 
+   arrange(desc(tot_pax_dep)) %>% 
+  ungroup()
+
+
+stats_aeroports_table <- stats_aeroports %>%
+  mutate(name_clean = paste0(str_to_sentence(apt_nom), " _(", apt, ")_")
+  ) %>%
+  select(name_clean, everything())
+
+#création de la fonction
+summary_stat_airport <- function(dataframe) {
+  stats_aeroports <- dataframe %>%  group_by(apt,apt_nom) %>% 
+    summarise(tot_pax_dep=round(sum(apt_pax_dep,na.rm=T),3),
+              tot_pax_arr=round(sum(apt_pax_arr,na.rm=T),3),
+              tot_pax_tr=round(sum(apt_pax_tr,na.rm=T),3)) %>% 
+    arrange(desc(tot_pax_dep)) %>% 
+    ungroup()
+  
+  return(stats_aeroports)
+  
+    
+}
+
+#fonction nb de passagers locaux 
+summary_stat_liaisons <- function(data){
+  agg_data <- data %>%
+    group_by(lsn_fsc) %>%
+    summarise(
+      paxloc = round(sum(lsn_pax_loc, na.rm = TRUE)*1e-6,3)
+    ) %>%
+    ungroup()
+  return(agg_data)
+}
+
+stat_liaisons <- summary_stat_liaisons(pax_lsn_all)
+
+
+#création d'un tableau HTML à l'aide du package GT
+
+table_aeroports <- stats_aeroports_table %>% 
+  select(-starts_with("apt")) %>% 
+  gt() %>% 
+  tab_header(title = md("**Statistiques de fréquentation**"),
+             subtitle=md("Classement des aéroports")) %>% 
+  cols_label(name_clean=md("**Aéroport**"),
+             tot_pax_dep=md("**Départs**"),
+             tot_pax_arr=md("**Arrivées**"),
+             tot_pax_tr=md("**Transit**")) %>% 
+  tab_source_note(md("_Source: DGAC, à partir des données sur data.gouv.fr_")) %>% 
+  tab_style(style=list(cell_fill(color="lightcyan"),
+                       cell_text(weight="bold")),
+            locations=cells_body(columns=name_clean)) %>% 
+   fmt_number(columns = everything(),suffixing=T) %>% 
+  fmt_markdown(columns = "name_clean") %>% 
+  opt_interactive()
+
+table_aeroports
+
+#fonction associée
+create_table_airports <- function(stats_aeroports){
+  
+  stats_aeroports_table <- stats_aeroports %>%
+    mutate(name_clean = paste0(str_to_sentence(apt_nom), " _(", apt, ")_")
+    ) %>%
+    select(name_clean, everything())
+  
+  table_aeroports <- gt(stats_aeroports_table)
+  
+  table_aeroports <- table_aeroports %>%
+    cols_hide(columns = starts_with("apt"))
+  
+  table_aeroports <- table_aeroports %>%
+    fmt_number(columns = starts_with("pax"), suffixing = TRUE)
+  
+  table_aeroports <- table_aeroports %>%
+    fmt_markdown(columns = "name_clean")
+  
+  table_aeroports <- table_aeroports %>%
+    cols_label(
+      name_clean = md("**Aéroport**"),
+      paxdep = md("**Départs**"),
+      paxarr = md("**Arrivée**"),
+      paxtra = md("**Transit**")
+    ) %>%
+    tab_header(
+      title = md("**Statistiques de fréquentation**"),
+      subtitle = md("Classement des aéroports")
+    ) %>%
+    tab_style(
+      style = cell_fill(color = "powderblue"),
+      locations = cells_title()
+    ) %>%
+    tab_source_note(source_note = md("_Source: DGAC, à partir des données sur data.gouv.fr_"))
+  
+  table_aeroports <- table_aeroports %>%
+    opt_interactive()
+  
+  return(table_aeroports)
+  
+}
+
+
+#Carte trafic des aéroports
+
+month <- 1
+year <- 2019
+
+palette <- c("darkred", "dodgerblue","forestgreen","gold")
+
+# icônes
+icons <- awesomeIcons(
+  icon = 'plane',
+  iconColor = 'black',
+  library = 'fa',
+  markerColor = trafic_aeroports$color
+)
+
+#filtre sur janvier 2019
+trafic_date <- pax_apt_all %>%
+  mutate(
+    date = as.Date(paste(anmois, "01", sep=""), format = "%Y%m%d")
+  ) %>%
+  filter(mois == month, an == year)
+
+#fusion avec lieu de localisation des aéroports
+trafic_aeroports <- airports_location %>%
+  inner_join(trafic_date, by = c("Code.OACI" = "apt"))
+
+#création d'une variable volume qui classe chaque observation dans son tercile 
+# et transforme la valeur en couleur à partir de palette.
+
+trafic_aeroports <- trafic_aeroports %>% 
+  mutate(
+    volume = ntile(trafic, 3)
+  ) %>%
+  mutate(
+    color = palette[volume]
+  )
+
+#création de la carte interactive  
+carte_interactive <- leaflet(trafic_aeroports) %>% addTiles() %>%
+  addAwesomeMarkers(
+    icon=icons[],
+    label=~paste0(Nom, "", " (",Code.OACI, ") : ", trafic, " voyageurs")
+  )
+
+carte_interactive
+
+
+#fonction associée
+
+map_leaflet_airport <- function(df,airports_location,month,year) {
+
+ #palette de couleur
+   palette <- c("darkred", "dodgerblue","forestgreen","gold")
+  
+  # icônes
+  icons <- awesomeIcons(
+    icon = 'plane',
+    iconColor = 'black',
+    library = 'fa',
+    markerColor = trafic_aeroports$color
+  )
+  
+  #filtre un mois et une année
+  trafic_date <- df %>%
+    mutate(
+      date = as.Date(paste(anmois, "01", sep=""), format = "%Y%m%d")
+    ) %>%
+    filter(mois == month, an == year)
+  
+  #fusion avec lieu de localisation des aéroports
+  trafic_aeroports <- airports_location %>%
+    inner_join(trafic_date, by = c("Code.OACI" = "apt"))
+  
+  #création d'une variable volume qui classe chaque observation dans son tercile 
+  # et transforme la valeur en couleur à partir de palette.
+  
+  trafic_aeroports <- trafic_aeroports %>% 
+    mutate(
+      volume = ntile(trafic, 3)
+    ) %>%
+    mutate(
+      color = palette[volume]
+    )
+  
+  #création de la carte interactive  
+  carte_interactive <- leaflet(trafic_aeroports) %>% addTiles() %>%
+    addAwesomeMarkers(
+      icon=icons[],
+      label=~paste0(Nom, "", " (",Code.OACI, ") : ", trafic, " voyageurs")
+    )
+  
+  return(carte_interactive)
+  }
+
+
+
+

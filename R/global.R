@@ -2,9 +2,15 @@ library(readr)
 library(dplyr)
 library(stringr)
 library(lubridate)
+# Environment ----------------------------------
+
+library(readr)
+library(dplyr)
+library(lubridate)
+library(stringr)
 library(sf)
-library(plotly)
 library(ggplot2)
+library(plotly)
 library(gt)
 library(leaflet)
 library(bslib)
@@ -12,14 +18,14 @@ library(bslib)
 source("R/import_data.R")
 source("R/create_data_list.R")
 source("R/clean_dataframe.R")
-source("R/figures.R")
 source("R/divers_functions.R")
-sources("R/tables.R")
+source("R/tables.R")
+source("R/figures.R")
 
-YEARS_LIST  <- as.character(2018:2022)
-MONTHS_LIST <- 1:12
-years <- YEARS_LIST[1]
-months <- MONTHS_LIST[1]
+# Global variables ---------------------------
+
+YEARS_LIST <- 2018:2022
+MONTHS_LIST = 1:12
 
 # Load data ----------------------------------
 urls <- create_data_list("./sources.yml")
@@ -34,9 +40,12 @@ airports_location <- st_read(urls$geojson$airport)
 liste_aeroports <- unique(pax_apt_all$apt)
 default_airport <- liste_aeroports[1]
 
-#Objets nécessaires à l'application ---------------------
-trafic_aeroports <- pax_apt_all %>% 
-  filter(apt==default_airport) %>%
-  mutate(trafic=apt_pax_dep+apt_pax_tr+apt_pax_arr,
-         date=as.Date(paste(anmois,"01",sep=""),format="%Y%m%d"))
 
+# OBJETS NECESSAIRES A L'APPLICATION ------------------------
+
+trafic_aeroports <- pax_apt_all %>%
+  mutate(trafic = apt_pax_dep + apt_pax_tr + apt_pax_arr) %>%
+  filter(apt %in% default_airport) %>%
+  mutate(
+    date = as.Date(paste(anmois, "01", sep=""), format = "%Y%m%d")
+  )

@@ -1,4 +1,3 @@
-#fonction importation aeroports
 import_airport_data <- function(list_files){
   
   pax_apt_all <- readr::read_csv2(
@@ -17,24 +16,27 @@ import_airport_data <- function(list_files){
   
 }
 
-#fonction d'importation de la table compagnies
-import_compagnies_data <- function(list_file) {
-  pax_cie_all <- readr::read_csv2(file=list_files,
-                                      col_types = cols(
-                                        ANMOIS = col_character(),
-                                        CIE = col_character(),
-                                        CIE_NOM = col_character(),
-                                        CIE_NAT = col_character(),
-                                        CIE_PAYS = col_character(),
-                                        .default = col_double()
-                                      )) %>% 
+
+import_compagnies_data <- function(list_files){
+  
+  pax_cie_all <- readr::read_csv2(
+    file = list_files,
+    col_types = cols(
+      ANMOIS = col_character(),
+      CIE = col_character(),
+      CIE_NOM = col_character(),
+      CIE_NAT = col_character(),
+      CIE_PAYS = col_character(),
+      .default = col_double()
+    )
+  ) %>% 
     clean_dataframe()
   
   return(pax_cie_all)
   
+  
 }
 
-#fonction importation liaisons
 
 import_liaisons_data <- function(list_files){
   

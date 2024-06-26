@@ -277,20 +277,13 @@ create_table_airports <- function(stats_aeroports){
 
 #Carte trafic des aéroports
 
-month <- 1
-year <- 2019
+month <- 7
+year <- 2021
 
 palette <- c("darkred", "dodgerblue","forestgreen","gold")
 
-# icônes
-icons <- awesomeIcons(
-  icon = 'plane',
-  iconColor = 'black',
-  library = 'fa',
-  markerColor = trafic_aeroports$color
-)
 
-#filtre sur janvier 2019
+#filtre sur mois et année
 trafic_date <- pax_apt_all %>%
   mutate(
     date = as.Date(paste(anmois, "01", sep=""), format = "%Y%m%d")
@@ -298,19 +291,28 @@ trafic_date <- pax_apt_all %>%
   filter(mois == month, an == year)
 
 #fusion avec lieu de localisation des aéroports
-trafic_aeroports <- airports_location %>%
+trafic_aeroports <- airports_location %>%    
+  select(Code.OACI,Nom,geometry) %>% 
   inner_join(trafic_date, by = c("Code.OACI" = "apt"))
 
 #création d'une variable volume qui classe chaque observation dans son tercile 
 # et transforme la valeur en couleur à partir de palette.
 
 trafic_aeroports <- trafic_aeroports %>% 
-  mutate(
+  mutate(trafic=apt_pax_dep+apt_pax_arr+apt_pax_tr,
     volume = ntile(trafic, 3)
   ) %>%
   mutate(
     color = palette[volume]
   )
+
+# icônes
+icons <- awesomeIcons(
+  icon = 'plane',
+  iconColor = 'black',
+  library = 'fa',
+  markerColor =  trafic_aeroports$color
+)
 
 #création de la carte interactive  
 carte_interactive <- leaflet(trafic_aeroports) %>% addTiles() %>%
@@ -322,7 +324,7 @@ carte_interactive <- leaflet(trafic_aeroports) %>% addTiles() %>%
 carte_interactive
 
 
-#fonction associée
+#fonction carte ----
 
 map_leaflet_airport <- function(df,airports_location,month,year) {
 
@@ -346,6 +348,7 @@ map_leaflet_airport <- function(df,airports_location,month,year) {
   
   #fusion avec lieu de localisation des aéroports
   trafic_aeroports <- airports_location %>%
+    select(Code.OACI,Nom,geometry) %>% 
     inner_join(trafic_date, by = c("Code.OACI" = "apt"))
   
   #création d'une variable volume qui classe chaque observation dans son tercile 
@@ -368,7 +371,6 @@ map_leaflet_airport <- function(df,airports_location,month,year) {
   
   return(carte_interactive)
   }
-
 
 
 
